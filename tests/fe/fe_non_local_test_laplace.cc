@@ -1,30 +1,30 @@
 
-#include <deal.II/grid/tria.h>
-#include <deal.II/dofs/dof_handler.h>
-#include <deal.II/grid/grid_generator.h>
-
-#include <deal.II/grid/tria_accessor.h>
-#include <deal.II/grid/tria_iterator.h>
-#include <deal.II/dofs/dof_accessor.h>
-
-#include <deal.II/fe/fe_q.h>
-#include <deal.II/dofs/dof_tools.h>
-
-#include <deal.II/fe/fe_values.h>
+#include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 
-#include <deal.II/base/function.h>
-#include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/matrix_tools.h>
+#include <deal.II/dofs/dof_accessor.h>
+#include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_tools.h>
 
-#include <deal.II/lac/vector.h>
-#include <deal.II/lac/full_matrix.h>
-#include <deal.II/lac/sparse_matrix.h>
+#include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_values.h>
+
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/tria.h>
+#include <deal.II/grid/tria_accessor.h>
+#include <deal.II/grid/tria_iterator.h>
+
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
-#include <deal.II/lac/solver_cg.h>
+#include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/precondition.h>
+#include <deal.II/lac/solver_cg.h>
+#include <deal.II/lac/sparse_matrix.h>
+#include <deal.II/lac/vector.h>
 
 #include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/matrix_tools.h>
+#include <deal.II/numerics/vector_tools.h>
+
 #include <fstream>
 #include <iostream>
 
@@ -32,19 +32,46 @@
 
 using namespace dealii;
 
+template <int dim>
+class Solution : public Function<dim>
+{
+public:
+  Solution()
+    : Function<dim>()
+  {}
+  virtual double
+  value(const Point<dim> &p, const unsigned int component = 0) const;
+};
+
+template <int dim>
+double
+Solution<dim>::value(const Point<dim> &p, const unsigned int) const
+{
+  double return_value =
+    sin(2. * numbers::PI * p[0]) * sin(2. * numbers::PI * p[1]);
+  return return_value;
+}
+
+
 class Step3
 {
 public:
   Step3();
 
-  void run();
+  void
+  run();
 
 private:
-  void make_grid();
-  void setup_system();
-  void assemble_system();
-  void solve();
-  void output_results() const;
+  void
+  make_grid();
+  void
+  setup_system();
+  void
+  assemble_system();
+  void
+  solve();
+  void
+  error_analysis();
 
   Triangulation<2> triangulation;
   FE_Q<2>          fe;
@@ -64,20 +91,22 @@ Step3::Step3()
   , dof_handler(triangulation)
 {}
 
-void Step3::make_grid()
+void
+Step3::make_grid()
 {
   GridGenerator::hyper_cube(triangulation, 0, 1);
   triangulation.refine_global(5);
 
   deallog << "Number of active cells: " << triangulation.n_active_cells()
-            << std::endl;
+          << std::endl;
 }
 
-void Step3::setup_system()
+void
+Step3::setup_system()
 {
   dof_handler.distribute_dofs(fe);
   deallog << "Number of degrees of freedom: " << dof_handler.n_dofs()
-            << std::endl;
+          << std::endl;
 
   DynamicSparsityPattern dsp(dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern(dof_handler, dsp);
@@ -92,18 +121,27 @@ void Step3::setup_system()
 // define the right hand-side function
 
 template <int dim>
-double function (const Point<dim> &p){
-    return {- 8.0 * dealii::numbers::PI * dealii::numbers::PI
-    * (sin(2.0*dealii::numbers::PI * p[0])
-       * sin(2.0*dealii::numbers::PI * p[1]))};
+double
+function(const Point<dim> &p)
+{
+  return {8.0 * dealii::numbers::PI * dealii::numbers::PI *
+          (sin(2.0 * dealii::numbers::PI * p[0]) *
+           sin(2.0 * dealii::numbers::PI * p[1]))};
 }
 
 
-void Step3::assemble_system()
+void
+Step3::assemble_system()
 {
+  deallog << "fe.n_dofs_per_cell = " << fe.dofs_per_cell << std::endl;
+  deallog << "fe.n_dofs_per_face = " << fe.dofs_per_face << std::endl;
+  deallog << "fe.n_dofs_per_vertex = " << fe.dofs_per_vertex << std::endl;
+  deallog << "fe.non_local_dofs_per_cell = " << fe.non_local_dofs_per_cell
+          << std::endl;
+
   QGauss<2> quadrature_formula(2);
-    auto qpts = quadrature_formula.get_points();
-    
+  auto      qpts = quadrature_formula.get_points();
+
   FEValues<2> fe_values(fe,
                         quadrature_formula,
                         update_values | update_gradients | update_JxW_values);
@@ -118,7 +156,6 @@ void Step3::assemble_system()
 
   for (const auto &cell : dof_handler.active_cell_iterators())
     {
-
       fe_values.reinit(cell);
 
       cell_matrix = 0;
@@ -126,17 +163,14 @@ void Step3::assemble_system()
 
       for (unsigned int q_index = 0; q_index < n_q_points; ++q_index)
         {
-
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             for (unsigned int j = 0; j < dofs_per_cell; ++j)
               cell_matrix(i, j) +=
                 (fe_values.shape_grad(i, q_index) *
-                 fe_values.shape_grad(j, q_index) *
-                 fe_values.JxW(q_index));
+                 fe_values.shape_grad(j, q_index) * fe_values.JxW(q_index));
           auto qpt = mapping.transform_unit_to_real_cell(cell, qpts[q_index]);
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
-            cell_rhs(i) += (fe_values.shape_value(i, q_index) *
-                            function(qpt) *
+            cell_rhs(i) += (fe_values.shape_value(i, q_index) * function(qpt) *
                             fe_values.JxW(q_index));
         }
 
@@ -164,31 +198,57 @@ void Step3::assemble_system()
                                      system_rhs);
 }
 
-
-void Step3::solve()
+void
+Step3::solve()
 {
   SolverControl solver_control(1000, 1e-12);
 
   SolverCG<> solver(solver_control);
 
   solver.solve(system_matrix, solution, system_rhs, PreconditionIdentity());
-
-  deallog <<  solution << std::endl;
 }
 
-void Step3::run()
+void
+Step3::error_analysis()
 {
-  make_grid();
-  setup_system();
-  assemble_system();
-  solve();
+  Vector<double> difference(triangulation.n_active_cells());
+  ;
+  Solution<2> exact_solution;
+  QGauss<2>   quadrature_formula(3);
+  auto        qpts = quadrature_formula.get_points();
+  VectorTools::integrate_difference(mapping,
+                                    dof_handler,
+                                    solution,
+                                    exact_solution,
+                                    difference,
+                                    quadrature_formula,
+                                    VectorTools::L2_norm);
+  double global_error = VectorTools::compute_global_error(triangulation,
+                                                          difference,
+                                                          VectorTools::L2_norm);
+  if (global_error < 0.05)
+    deallog << "Global error less than 5%, test is passed" << std::endl;
 }
 
-int main()
+void
+Step3::run()
+{
+  deallog << "Generate grid, " << std::endl;
+  make_grid();
+  deallog << "setup system for Laplace problem, " << std::endl;
+  setup_system();
+  deallog << "assembly system matrix, " << std::endl;
+  assemble_system();
+  deallog << "solve system of equations, " << std::endl;
+  solve();
+  deallog << "compute global L2 error, " << std::endl;
+  error_analysis();
+}
+
+int
+main()
 {
   initlog();
-  
-  deallog.depth_console(2);
 
   Step3 laplace_problem;
   laplace_problem.run();

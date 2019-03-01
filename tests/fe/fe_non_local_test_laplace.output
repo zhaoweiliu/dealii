@@ -1,0 +1,15 @@
+
+DEAL::Generate grid, 
+DEAL::Number of active cells: 1024
+DEAL::setup system for Laplace problem, 
+DEAL::Number of degrees of freedom: 1089
+DEAL::assembly system matrix, 
+DEAL::fe.n_dofs_per_cell = 4
+DEAL::fe.n_dofs_per_face = 2
+DEAL::fe.n_dofs_per_vertex = 1
+DEAL::fe.non_local_dofs_per_cell = 0
+DEAL::solve system of equations, 
+DEAL:cg::Starting value 1.22580
+DEAL:cg::Convergence step 1 value 2.91935e-14
+DEAL::compute global L2 error, 
+DEAL::Global error less than 5%, test is passed
